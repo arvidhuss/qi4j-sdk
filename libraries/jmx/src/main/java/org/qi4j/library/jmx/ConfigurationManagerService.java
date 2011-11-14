@@ -16,6 +16,8 @@ package org.qi4j.library.jmx;
 
 import org.qi4j.api.Qi4j;
 import org.qi4j.api.association.AssociationStateHolder;
+import org.qi4j.api.composite.Composite;
+import org.qi4j.api.composite.CompositeInstance;
 import org.qi4j.api.configuration.Configuration;
 import org.qi4j.api.entity.EntityComposite;
 import org.qi4j.api.entity.EntityDescriptor;
@@ -32,6 +34,7 @@ import org.qi4j.api.structure.Application;
 import org.qi4j.api.structure.Module;
 import org.qi4j.api.type.EnumType;
 import org.qi4j.api.unitofwork.UnitOfWork;
+import org.qi4j.api.unitofwork.UnitOfWorkCompletionException;
 import org.qi4j.api.unitofwork.UnitOfWorkFactory;
 
 import javax.management.*;
@@ -63,7 +66,7 @@ public interface ConfigurationManagerService
         Qi4j api;
 
         @Service
-        Iterable<ServiceReference<Configuration>> configurableServices;
+        Iterable<ServiceReference<?>> configurableServices;
 
         private List<ObjectName> configurationNames = new ArrayList<ObjectName>();
 
@@ -77,9 +80,26 @@ public interface ConfigurationManagerService
         private void exportConfigurableServices()
             throws NotCompliantMBeanException, MBeanRegistrationException, InstanceAlreadyExistsException, MalformedObjectNameException
         {
-            for( ServiceReference<Configuration> configurableService : configurableServices )
+            for( ServiceReference<?> configurableService : configurableServices )
             {
-                String serviceClass = configurableService.get().getClass().getInterfaces()[ 0 ].getName();
+                Object service = configurableService.get();
+
+                if (!(service instanceof Composite))
+                    continue; // Skip imported services
+
+                // Check if service has configuration
+                CompositeInstance compositeInstance = Qi4j.INSTANCE_FUNCTION.map( (Composite) service );
+                try
+                {
+                    Configuration config = compositeInstance.newProxy( Configuration.class );
+                }
+                catch( Exception e )
+                {
+                    // Service does not have configuration
+                    continue;
+                }
+
+                String serviceClass = compositeInstance.type().getName();
                 String name = configurableService.identity();
                 ServiceDescriptor serviceDescriptor = api.getServiceDescriptor( configurableService );
                 Module module = api.getModule( configurableService );
@@ -219,9 +239,16 @@ public interface ConfigurationManagerService
                         property.set( attribute.getValue() );
                     }
 
-                    uow.complete();
+                    try
+                    {
+                        uow.complete();
+                    }
+                    catch( UnitOfWorkCompletionException e )
+                    {
+                        throw new ReflectionException( e );
+                    }
                 }
-                catch( Exception ex )
+                finally
                 {
                     uow.discard();
                 }
@@ -296,9 +323,9 @@ public interface ConfigurationManagerService
         class ConfigurableService
             extends EditableConfiguration
         {
-            private ServiceReference<Configuration> service;
+            private ServiceReference<?> service;
 
-            ConfigurableService( ServiceReference<Configuration> service,
+            ConfigurableService( ServiceReference<?> service,
                                  MBeanInfo info,
                                  String identity,
                                  Map<String, AccessibleObject> propertyNames
@@ -319,7 +346,8 @@ public interface ConfigurationManagerService
                         if( service.isActive() )
                         {
                             // Refresh configuration
-                            service.get().refresh();
+                            CompositeInstance compositeInstance = Qi4j.INSTANCE_FUNCTION.map( (Composite) service.get() );
+                            compositeInstance.newProxy( Configuration.class ).refresh();
 
                             ( (Activatable) service ).passivate();
                             ( (Activatable) service ).activate();
