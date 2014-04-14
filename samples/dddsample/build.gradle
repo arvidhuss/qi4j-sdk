@@ -21,7 +21,7 @@ uploadArchives {
       configuration = configurations.deployerJars
       //repository(url: "scp://repository.ops4j.org/home/www/repository.ops4j.org/maven2/")
         repository(url: "dav:https://repository-streamflow.forge.cloudbees.com/release") {
-            authentication(userName: "arvidhuss", password: "q9YW1nK8cloudbees")
+            authentication(userName: deployUser, password: deployPassword )
         }
     }
   }
