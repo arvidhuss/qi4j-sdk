@@ -24,9 +24,9 @@ buildscript {
   repositories {
     mavenCentral()
   }
-  dependencies {
+  /*dependencies {
     classpath 'de.huxhorn.gradle:de.huxhorn.gradle.pgp-plugin:0.0.3'
-  }
+  }*/
 }
 
 
@@ -36,7 +36,7 @@ allprojects {
   apply plugin: 'java'
   apply plugin: 'code-quality'
   apply plugin: 'project-report'
-  apply plugin: de.huxhorn.gradle.pgp.PgpPlugin
+  //apply plugin: de.huxhorn.gradle.pgp.PgpPlugin
 
   defaultTasks 'classes','test'
   project.Xslt = Xslt.class
@@ -63,7 +63,9 @@ allprojects {
     testCompile('junit:junit:4.8.1')
     testRuntime('net.sourceforge.cobertura:cobertura:1.9.3')
     testRuntime("asm:asm:$asmVersion", "asm:asm-util:$asmVersion", "asm:asm-commons:$asmVersion")
-    deployerJars "org.apache.maven.wagon:wagon-ssh:1.0-beta-2"
+    //deployerJars "org.apache.maven.wagon:wagon-ssh:1.0-beta-2"
+    deployerJars 'org.apache.maven.wagon:wagon-webdav-jackrabbit:1.0-beta-6'
+
   }
 
 
@@ -220,9 +222,12 @@ allprojects {
   uploadArchives {
     dependsOn check
     repositories.mavenDeployer {
-      name = 'sshDeployer' // optional
+      //name = 'sshDeployer' // optional
       configuration = configurations.deployerJars
-      repository(url: "scp://repository.ops4j.org/home/www/repository.ops4j.org/maven2/")
+      //repository(url: "scp://repository.ops4j.org/home/www/repository.ops4j.org/maven2/")
+      repository(url: "dav:https://repository-streamflow.forge.cloudbees.com/release") {
+          authentication(userName: "arvidhuss", password: "q9YW1nK8cloudbees")
+      }
     }
   }
 
